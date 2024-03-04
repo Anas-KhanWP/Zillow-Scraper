@@ -3,17 +3,8 @@ import time
 import random
 import json
 import httpx
-import csv
-import pandas as pd
-import os
-import time
-import json
-import random
-import httpx
 import pandas as pd
 from scrapy import Selector
-from parsel import Selector
-from datetime import datetime, timedelta
 from datetime import datetime, timedelta
 
 
@@ -29,10 +20,10 @@ class ZillowScraper:
 
     Raises:
         ValueError: If the input data is not in the expected format.
-
     """
 
     def __init__(self):
+        # Initialize a list of RapidAPI keys for rotating usage
         self.rapidapi_keys = [
             "d376ac8d6amsh71c43b1ae6e6e76p106aaajsn9564fb4e9d93",
             "6290c2073amsh3c8ccdb2a0e82dep17d44djsn277c3f25996c",
@@ -43,9 +34,20 @@ class ZillowScraper:
         ]
 
     def rotate_rapidapi_key(self):
+        """Rotate RapidAPI key for each API request."""
         return random.choice(self.rapidapi_keys)
 
     def convert_time_interval(self, interval):
+        """
+        Convert time intervals like '2 hours ago' to a datetime format.
+
+        Args:
+            interval (str): Time interval string.
+
+        Returns:
+            str: Formatted time string.
+
+        """
         current_time = datetime.now()
 
         if "minutes ago" in interval:
@@ -64,6 +66,17 @@ class ZillowScraper:
         return formatted_time
 
     def parse_property(self, data: dict, city) -> pd.DataFrame:
+        """
+        Parse the JSON data returned from the API and extract relevant property information.
+
+        Args:
+            data (dict): JSON data returned from the API.
+            city (str): Name of the city.
+
+        Returns:
+            pd.DataFrame: DataFrame containing parsed property information.
+
+        """
         results_list = []
         try:
             # Extracting list of search results from the data
@@ -85,6 +98,7 @@ class ZillowScraper:
                 home_type = result.get("hdpData", {}).get("homeInfo", {}).get("homeType", "N/A")
                 post_at = result.get("variableData", {}).get("text", "N/A")
                 post_at = self.convert_time_interval(post_at)
+
                 # Writing the extracted data to the DataFrame
                 results_list.append([
                     link_of_listing,
@@ -116,6 +130,13 @@ class ZillowScraper:
         )
 
     def scrape_results(self):
+        """
+        Scrape real estate data from Zillow for multiple cities.
+
+        Returns:
+            pd.DataFrame: DataFrame containing scraped property data.
+
+        """
         BASE_HEADERS = {
             "X-RapidAPI-Key": self.rotate_rapidapi_key(),
             "X-RapidAPI-Host": "getproxylist-getproxylist-v1.p.rapidapi.com",
@@ -126,6 +147,7 @@ class ZillowScraper:
             "accept-encoding": "gzip, deflate, br",
         }
 
+        # URLs for different cities
         city_urls = {
             "Brooklyn": "https://www.zillow.com/brooklyn-new-york-ny/?searchQueryState=%7B%22isMapVisible%22%3Atrue%2C%22mapBounds%22%3A%7B%22north%22%3A40.76278499807343%2C%22south%22%3A40.54712385284077%2C%22east%22%3A-73.73687118896483%2C%22west%22%3A-74.13855881103514%7D%2C%22mapZoom%22%3A12%2C%22filterState%22%3A%7B%22sort%22%3A%7B%22value%22%3A%22globalrelevanceex%22%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22con%22%3A%7B%22value%22%3Afalse%7D%2C%22ah%22%3A%7B%22value%22%3Atrue%7D%2C%22apa%22%3A%7B%22value%22%3Afalse%7D%2C%22apco%22%3A%7B%22value%22%3Afalse%7D%2C%22doz%22%3A%7B%22value%22%3A%221%22%7D%7D%2C%22isListVisible%22%3Atrue%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A37607%2C%22regionType%22%3A17%7D%5D%2C%22pagination%22%3A%7B%7D%7D",
             "Queens": "https://www.zillow.com/queens-new-york-ny/?searchQueryState=%7B%22isMapVisible%22%3Atrue%2C%22mapBounds%22%3A%7B%22north%22%3A40.88660150634466%2C%22south%22%3A40.455384810621325%2C%22east%22%3A-73.4297643779297%2C%22west%22%3A-74.23313962207033%7D%2C%22mapZoom%22%3A11%2C%22filterState%22%3A%7B%22sort%22%3A%7B%22value%22%3A%22globalrelevanceex%22%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22con%22%3A%7B%22value%22%3Afalse%7D%2C%22ah%22%3A%7B%22value%22%3Atrue%7D%2C%22apa%22%3A%7B%22value%22%3Afalse%7D%2C%22apco%22%3A%7B%22value%22%3Afalse%7D%2C%22doz%22%3A%7B%22value%22%3A%221%22%7D%7D%2C%22isListVisible%22%3Atrue%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A270915%2C%22regionType%22%3A17%7D%5D%2C%22pagination%22%3A%7B%7D%7D",
@@ -172,24 +194,23 @@ class ZillowScraper:
         total_duration = end_time - start_time
         hours, remainder = divmod(total_duration, 3600)
         minutes, seconds = divmod(remainder, 60)
-        formatted_duration = "{:02}:{:02}:{:02}".format(
-            int(hours), int(minutes), int(seconds)
+
+        print(f"Scraping completed in {int(hours)} hours, {int(minutes)} minutes and {int(seconds)} seconds.")
+        print(f"Total number of results: {total_results}")
+
+        # Concatenate all DataFrames into one
+        full_df = pd.concat(results_list, ignore_index=True)
+
+        # Save the DataFrame to a CSV file
+        full_df.to_csv(
+            os.path.join(results_folder, f"zillow_results_{current_date_time}.csv"), index=False
         )
 
-        print(f"Total time taken: {formatted_duration}")
-        print("Total Results:", total_results)
-        try:
-            # Concatenate all DataFrames in the list
-            final_df = pd.concat(results_list, ignore_index=True)
-        except:
-            final_df = "results not found"
-
-        return final_df
+        return full_df
 
 
 # Instantiate the scraper object
 scraper = ZillowScraper()
 
-# Call the scrape_results method
-alpha = scraper.scrape_results()
-print(alpha)
+# Scrape Zillow data
+zillow_data = scraper.scrape_results()

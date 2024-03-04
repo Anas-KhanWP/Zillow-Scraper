@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     current_date_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     # Creating a folder with today's date inside "./results" if it doesn't exist
-    results_folder = os.path.join("results", datetime.datetime.now().strftime("%Y%m%d"))
+    results_folder = os.path.join("../results", datetime.datetime.now().strftime("%Y%m%d"))
 
     if not os.path.exists(results_folder):
         os.makedirs(results_folder)
